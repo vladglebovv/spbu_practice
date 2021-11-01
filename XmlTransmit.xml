@@ -1,0 +1,27 @@
+<ETHERNETKRL>
+ <CONFIGURATION>
+ <EXTERNAL>
+ <IP>127.0.0.1</IP>
+ <PORT>20001</PORT>
+ <TYPE>Server</TYPE>
+ </EXTERNAL>
+ <INTERNAL>
+ <ENVIRONMENT>Program</ENVIRONMENT>
+ <BUFFERING Mode="FIFO" Limit="10"/>
+ <BUFFSIZE Limit="16384"/>
+ <TIMEOUT Connect="60000"/>
+ <ALIVE Set_Out="666" Ping="200"/>
+ <PROTOCOL>TCP</PROTOCOL>
+ </INTERNAL>
+</CONFIGURATION>
+<SEND>
+ <XML>
+  <ELEMENT Tag="Robot/Data/LastPos/@X"/>
+ <ELEMENT Tag="Robot/Data/LastPos/@Y"/>
+ <ELEMENT Tag="Robot/Data/LastPos/@Z"/>
+ <ELEMENT Tag="Robot/Data/LastPos/@A"/>
+ <ELEMENT Tag="Robot/Data/LastPos/@B"/>
+ <ELEMENT Tag="Robot/Data/LastPos/@C"/>
+ </XML>
+</SEND>
+</ETHERNETKRL>
