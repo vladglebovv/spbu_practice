@@ -39,7 +39,7 @@ if __name__ == '__main__':
         "-c", "--camera",
         type=int,
         default=0,
-        required=True,
+        required=False,
     help="camera id in system")
     args = vars(ap.parse_args())
 
@@ -47,7 +47,6 @@ if __name__ == '__main__':
         print("[INFO] ArUCo tag of '{}' is not supported".format(
             args["type"]))
         sys.exit(0)
-
 
     try:
         cap = cv2.VideoCapture(args['camera'])
@@ -91,7 +90,7 @@ if __name__ == '__main__':
                     (topLeft[0], topLeft[1] - 15), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 255, 0), 2)
 
-        cv2.imshow("Image", img)
+        cv2.imshow("ArUco Detector", img)
 
         if cv2.waitKey(10) == 27 or not ret:
             cap.release()

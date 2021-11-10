@@ -2,6 +2,7 @@ import numpy as np
 import argparse
 import cv2
 import sys
+import uuid
 
 ARUCO_DICT = {
 	"DICT_4X4_50": cv2.aruco.DICT_4X4_50,
@@ -47,7 +48,8 @@ def generate_marker(_id: int, output:str = None, type: int = cv2.aruco.DICT_ARUC
 
 if __name__ == '__main__':
 	ap = argparse.ArgumentParser()
-	ap.add_argument("-o", "--output", required=True,
+	ap.add_argument("-o", "--output", required=False,
+		default=f'{uuid.uuid4().hex}.png',
 		help="path to output image containing ArUCo tag")
 	ap.add_argument("-i", "--id", type=int, required=True,
 		help="ID of ArUCo tag to generate")
