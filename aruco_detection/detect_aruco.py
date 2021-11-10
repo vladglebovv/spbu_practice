@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
 
     try:
-        cap = cv2.cap = cv2.VideoCapture(args['c'])
+        cap = cv2.VideoCapture(args['camera'])
     except Exception:
         print("Wrong camera!")
         sys.exit(0)
@@ -91,7 +91,7 @@ if __name__ == '__main__':
                     (topLeft[0], topLeft[1] - 15), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 255, 0), 2)
 
-                cv2.imshow("Image", img)
+        cv2.imshow("Image", img)
 
         if cv2.waitKey(10) == 27 or not ret:
             cap.release()
