@@ -2,6 +2,9 @@ import cv2
 import argparse
 import sys
 import imutils
+import asyncio
+import numpy as np
+from data_manipulation.data_types import PositionData
 
 ARUCO_DICT = {
     "DICT_4X4_50": cv2.aruco.DICT_4X4_50,
@@ -27,72 +30,82 @@ ARUCO_DICT = {
     "DICT_APRILTAG_36h11": cv2.aruco.DICT_APRILTAG_36h11
 }
 
-MARKER_SIZE_CM = 3.0
+MARKER_SIZE_CM = 60
 
-if __name__ == '__main__':
 
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-t", "--type", type=str,
-                    default="DICT_ARUCO_ORIGINAL",
-                    help="type of ArUCo tag to detect")
-    ap.add_argument(
-        "-c", "--camera",
-        type=int,
-        default=0,
-        required=False,
-        help="camera id in system")
-    args = vars(ap.parse_args())
+class ArucoMarkersDetector:
+    def __init__(self, dict_name, marker_length, camera_matrix, dist_coeffs):
+        if dict_name not in ARUCO_DICT:
+            print(f"[INFO] ArUCo tag of '{dict_name}' is not supported")
+            raise ValueError
 
-    if ARUCO_DICT.get(args["type"], None) is None:
-        print("[INFO] ArUCo tag of '{}' is not supported".format(
-            args["type"]))
-        sys.exit(0)
+        self.arucoDict = cv2.aruco.Dictionary_get(ARUCO_DICT[dict_name])
+        self.arucoParams = cv2.aruco.DetectorParameters_create()
+        self.marker_length = marker_length
+        self.camera_matrix = camera_matrix
+        self.dist_coeffs = dist_coeffs
 
-    try:
-        cap = cv2.VideoCapture(args['camera'])
-    except Exception:
-        print("Wrong camera!")
-        sys.exit(0)
-
-    arucoDict = cv2.aruco.Dictionary_get(ARUCO_DICT[args["type"]])
-    arucoParams = cv2.aruco.DetectorParameters_create()
-
-    while True:
-        ret, img = cap.read()
-        img = imutils.resize(img, width=1000)
+    async def get_markers_corners(self, img):
         (corners, ids, rejected) = cv2.aruco.detectMarkers(
             img,
-            arucoDict,
-            parameters=arucoParams
+            self.arucoDict,
+            parameters=self.arucoParams
         )
+        return corners, ids
 
-        if len(corners) > 0:
-            ids = ids.flatten()
-            for (markerCorner, markerID) in zip(corners, ids):
-                corners = markerCorner.reshape((4, 2))
-                (topLeft, topRight, bottomRight, bottomLeft) = corners
+    async def get_positions_from_corners(self, corners):
+        rvecs, tvecs, _objPoints = cv2.aruco.estimatePoseSingleMarkers(	corners, self.marker_length, self.camera_matrix, self.dist_coeffs)
+        return rvecs, tvecs
 
-                topRight = (int(topRight[0]), int(topRight[1]))
-                bottomRight = (int(bottomRight[0]), int(bottomRight[1]))
-                bottomLeft = (int(bottomLeft[0]), int(bottomLeft[1]))
-                topLeft = (int(topLeft[0]), int(topLeft[1]))
+    async def get_positions_dict(self, img):
+        res = dict()
+        corners, markerIds = await self.get_markers_corners(img)
+        if markerIds is not None:
+            rvecs, tvecs = await self.get_positions_from_corners(corners)
+            for id, rvec, tvec in zip(markerIds, rvecs, tvecs):
+                res[id[0]] = PositionData.from_cv2(tvec, rvec)
+        return res
 
-                cv2.line(img, topLeft, topRight, (0, 255, 0), 2)
-                cv2.line(img, topRight, bottomRight, (0, 255, 0), 2)
-                cv2.line(img, bottomRight, bottomLeft, (0, 255, 0), 2)
-                cv2.line(img, bottomLeft, topLeft, (0, 255, 0), 2)
 
-                cX = int((topLeft[0] + bottomRight[0]) / 2.0)
-                cY = int((topLeft[1] + bottomRight[1]) / 2.0)
-                cv2.circle(img, (cX, cY), 4, (0, 0, 255), -1)
+async def main():
+    cap = cv2.VideoCapture(0)
 
-                cv2.putText(img, str(markerID),
-                            (topLeft[0], topLeft[1] - 15), cv2.FONT_HERSHEY_SIMPLEX,
-                            0.5, (0, 255, 0), 2)
+    cameraMatrix = np.array([[578.47,   0.,         337.02],
+ [  0.,         592.64, 225.09],
+ [  0.,           0.,           1.        ]])
+    distCoeffs = np.array([[-0.15423951,  0.22055058, -0.00810331, -0.00137378, -0.22319865]])
 
+    detec = ArucoMarkersDetector('DICT_7'
+                                 'X7_50', MARKER_SIZE_CM, cameraMatrix, distCoeffs)
+    while True:
+        ret, img = cap.read()
+        # img = imutils.resize(img, width=1000)
+        corners, markerIds = await detec.get_markers_corners(img)
+        rvecs, tvecs = await detec.get_positions_from_corners(corners)
+        cv2.aruco.drawDetectedMarkers(img, corners, markerIds)
+        # print(tvecs)
+        pos1 = None
+        pos2 = None
+        if rvecs is not None and tvecs is not None:
+            for rvec, tvec in zip(rvecs, tvecs):
+                img = cv2.aruco.drawAxis(img, cameraMatrix, distCoeffs, rvec, tvec, MARKER_SIZE_CM)
+            for id, rvec, tvec in zip(markerIds, rvecs, tvecs):
+                if id == 3:
+                    pos1 = PositionData.from_cv2(tvec, rvec)
+                if id == 4:
+                    pos2 = PositionData.from_cv2(tvec, rvec).inv()
+            # if pos1 is not None and pos2 is not None:
+            #     print(pos1.xyz, pos2.xyz, pos1.apply(pos2).xyz)
         cv2.imshow("ArUco Detector", img)
-
-        if cv2.waitKey(10) == 27 or not ret:
+        cv_key = cv2.waitKey(10)
+        if cv_key == 32:
+            print(pos1, "pos1")
+            print(pos2, "pos2")
+            print(pos2.apply(pos1), "diff")
+        if cv_key == 27 or not ret:
             cap.release()
             cv2.destroyAllWindows()
             sys.exit(0)
+
+if __name__ == '__main__':
+    asyncio.run(main())
